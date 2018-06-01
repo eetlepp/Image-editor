@@ -15,4 +15,4 @@ Kolmas kenttä = siveltimen leveys
 Neljäs kenttä = siveltimen korkeus
 
 
-Varoitus: Kuvan koon muuttaminen tyhjentää taustan.
+Varoitus: Koon muuttaminen tyhjentää taustan.
