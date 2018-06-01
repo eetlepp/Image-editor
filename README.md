@@ -2,6 +2,7 @@ Kuvankäsittelyohjelma
 
 
 Avaa kuvat PNG, JPG ja txt muodossa.
+
 Tallennus PNG, JPG tai tekstitiedostona.
 
 
