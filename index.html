@@ -1,0 +1,253 @@
+<html>
+	<meta charset="UTF-8">
+	<form>
+		<input id="imagewidth" type="text" value="256"></input>
+		<input id="imageheight" type="text" value="256"></input>
+		<input id="brushx" type="text" value="8"></input>
+		<input id="brushy" type="text" value="8"></input>
+		<div><input id="loadraw" type="file" name="" class="inputfile"></input></div>
+		<div><button type="button" id="saveraw">Save raw</button></div>
+		<div><button type="button" id="savepng">Save PNG</button></div>
+		<div><button type="button" id="savejpg">Save JPG</button></div>
+	</form>
+	<div id="editors">
+		<canvas id="editor0" width="16" height="16" style="background:rgb(0,0,0,0); border-style:dotted"></canvas>
+	</div>
+	<div id="colors">
+		<canvas id="black" width="16" height="16" style="background:rgb(0,0,0,1);"></canvas>
+		<canvas id="red" width="16" height="16" style="background:rgb(255,0,0,1);"></canvas>
+		<canvas id="green" width="16" height="16" style="background:rgb(0,255,0,1);"></canvas>
+		<canvas id="blue" width="16" height="16" style="background:rgb(0,0,255,1);"></canvas>
+		<canvas id="yellow" width="16" height="16" style="background:rgb(255,255,0,1);"></canvas>
+	</div>
+	
+	<body oncontextmenu="return false">
+		<script>
+			class editor{
+				constructor(canvas){
+					this.canvas = canvas;
+					this.ctx = canvas.getContext('2d');
+				}
+			}
+			
+			var editors = [];
+			function addeditor(canvas){
+				editors[editors.length] = new editor(canvas);
+			}
+			let editorlist = document.getElementById('editors').childNodes;
+			for(var i=1; i<editorlist.length-1; i+=2){
+				var e = editorlist[i];
+				addeditor(e); // Luo editori.
+			}
+				
+			let brushx = document.getElementById('brushx');			
+			let brushy = document.getElementById('brushy');			
+
+			let color = "rgb(0,0,0)";
+			
+			// värivalikko.
+			let colorlist = document.getElementById('colors').childNodes;
+			colorlist[1].style.border = "dashed 2px"; // ympyröi valittu väri.
+			for(var i=1; i<colorlist.length; i+=2){
+				var c = colorlist[i];
+				c.addEventListener('click', function(){
+					color = this.style.backgroundColor;
+					for(var j=1; j<colorlist.length; j+=2){
+						var c2 = colorlist[j];
+						c2.style.border = "none"; 
+					}
+					this.style.border = "dashed 2px"; // ympyröi valittu väri.
+				});
+			}
+			
+			// Avaa mikä tahansa kuva tai txt kuva.
+			function loadRaw() {			
+				if(loadraw.files && loadraw.files[0]){
+					var f = loadraw.files[0];
+					var type = f.name.split('.').pop();
+					var reader = new FileReader();
+					reader.addEventListener('load', function(event){
+						if(type=="txt"){
+							var contents = event.target.result;
+							var pixels = contents.split(",");
+							
+							var width = Number(pixels[0]);
+							var height = Number(pixels[1]);
+
+							setCanvasSize(width, height);
+							imagewidth.value = width;
+							imageheight.value = height;
+							
+							var imagearray = pixels.splice(2);
+		
+							// Luo kuva pikseli kerrallaan.
+							for(var y=0;y<height;y++){
+								for(var x=0;x<width;x++){
+									var pos = (y * width + x) * 4;
+
+									var r = imagearray[pos];
+									var g = imagearray[pos+1];
+									var b = imagearray[pos+2];
+									var a = imagearray[pos+3];
+									
+									var fillStyle = "rgb("+r+","+g+","+b+")";
+									editors[0].ctx.fillStyle = fillStyle;
+									editors[0].ctx.fillRect(x, y, 1, 1);
+								}
+							}
+							if(width && height)
+								console.log(f.name + " was loaded successfully (raw)");
+							else
+								alert("failed to load " + f.name + " (raw)");
+							israwmap = true;
+						}
+						else{
+							// Avaa kuva.
+							var img = document.createElement('img');
+							img.src = 'data:image/png;base64,' + btoa(event.target.result);
+							img.onload = function(){
+								editors[0].canvas.width = img.width;
+								editors[0].canvas.height = img.height;
+								editors[0].ctx.drawImage(img, 0, 0, img.width, img.height);
+								
+								imagewidth.value = img.width;
+								imageheight.value = img.height;
+								
+								if(img.width && img.height)
+									console.log(f.name + " was loaded successfully (raw)");
+								else
+									alert("failed to load " + f.name + " (raw)");							
+							};
+						}
+					});
+					reader.readAsBinaryString(f);
+				}
+			}
+			
+			loadraw.addEventListener("change", function(){
+				loadRaw();
+			});
+			
+			// Tallenna kuva.
+			saveraw.addEventListener('click', function(){
+				var width = editors[0].canvas.width;
+				var height = editors[0].canvas.height;
+				var buffer = editors[0].ctx.getImageData(0,0,width,height).data;
+				
+				var savestring = width+","+height+","+buffer.toString(); // Kirjoita leveys + korkeus + 4 väriä per pikseli.
+	
+				var name = "";
+				if(loadraw.files[0])
+					name = loadraw.files[0].name;
+				name = name.split(".")[0];
+				
+				name = name + ".raw";
+				
+				if(name!="")
+					saveRaw(name, savestring);
+				else
+					saveRaw("raw", savestring);
+			});
+			
+			function saveRaw(name, contents){
+				var textfile = new Blob([contents], {type:'text/plain'});
+				var filename = name+".txt";
+				var downloadLink = document.createElement("a");
+				downloadLink.download = filename;
+				downloadLink.href = window.URL.createObjectURL(textfile);
+				downloadLink.style.display = "none";
+				document.body.appendChild(downloadLink);
+				downloadLink.click();
+			}
+			
+			let savepng = document.getElementById('savepng');
+			let savejpg = document.getElementById('savejpg');
+			
+			function saveImage(type){
+				var image = new Image();
+								
+				var data = editors[0].canvas.toDataURL("image/png");
+				data = data.replace(/^data:image\/(png|jpg);base64,/, '');
+				
+				var download = document.createElement('a');
+				download.href = "data:image/"+type+";base64,"+data;
+				
+				var name = type;
+				if(loadraw.files[0])
+					name = loadraw.files[0].name;
+					
+				name = name.split(".")[0]; // Ota kuvan nimi.
+				download.download = name + "."+type;
+				
+				download.style.display = "none";
+				document.body.appendChild(download);
+				download.click();
+			}
+			
+			// Tallenna PNG.
+			savepng.addEventListener('click', function(){
+				saveImage("png");
+			});
+			
+			// Tallenna JPG.
+			savejpg.addEventListener('click', function(){
+				saveImage("jpg");
+			});		
+			
+			function setCanvasSize(aw, ah){
+				editors[0].canvas.width = Number(aw);
+				editors[0].canvas.height = Number(ah);
+				editors[0].ctx.fillStyle = "rgb(255,255,255,255)";
+				editors[0].ctx.fillRect(0,0,aw,ah); // luo valkoinen tausta jotta getImageData tallentaisi valkoisen värin.
+			}
+			setCanvasSize(imagewidth.value, imageheight.value);
+			
+			imagewidth.addEventListener("input", function(){
+				setCanvasSize(imagewidth.value, imageheight.value);
+			});
+			
+			imageheight.addEventListener("input", function(){
+				setCanvasSize(imagewidth.value, imageheight.value);
+			});
+			
+			function mouseevent0(event, click){			
+				var mousex = event.clientX;
+				var mousey = event.clientY;
+				
+				var rect = editors[0].canvas.getBoundingClientRect();
+				
+				var bx = Number(brushx.value);
+				var by = Number(brushy.value);
+				
+				var visiblemousex = (mousex-rect.left);
+				var visiblemousey = (mousey-rect.top);
+				
+				var snapx = bx * Math.round(visiblemousex/bx);
+				var snapy = by * Math.round(visiblemousey/by);
+				
+				visiblemousex = snapx;
+				visiblemousey = snapy;
+				
+				if(event.buttons==1){ // Piirrä.
+					editors[0].ctx.fillStyle = color;
+					editors[0].ctx.fillRect(visiblemousex, visiblemousey , bx, by);
+				}
+				else if(event.buttons==2){ // Pyyhi.
+					editors[0].ctx.fillStyle = "rgb(255,255,255)";
+					editors[0].ctx.clearRect(visiblemousex, visiblemousey, bx, by);
+				}
+			}
+			
+			function mouseevents0(){
+				editors[0].canvas.addEventListener('mousemove', function(event){
+					mouseevent0(event, false);
+				}, false);
+				
+				editors[0].canvas.addEventListener('mousedown', function(event){
+					mouseevent0(event, true);
+				}, false);
+			}
+			mouseevents0();
+		</script>
+	</body>
+</html>
